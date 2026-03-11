@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PhotoGetApp</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f4f4;
+      color: #222;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      margin: 0;
+    }
+
+    .card {
+      background: white;
+      padding: 2rem;
+      border-radius: 12px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+      width: 100%;
+      max-width: 420px;
+      text-align: center;
+    }
+
+    h1 {
+      margin-top: 0;
+    }
+
+    p {
+      color: #555;
+    }
+
+    button {
+      background: #111;
+      color: white;
+      border: none;
+      padding: 0.9rem 1.2rem;
+      border-radius: 8px;
+      font-size: 1rem;
+      cursor: pointer;
+      width: 100%;
+      margin-top: 1rem;
+    }
+
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    input,
+    select {
+      width: 100%;
+      padding: 0.75rem;
+      margin-top: 1rem;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+      box-sizing: border-box;
+    }
+
+    label {
+      display: block;
+      margin-top: 1rem;
+      text-align: left;
+      font-size: 0.95rem;
+      color: #333;
+    }
+
+    #status {
+      margin-top: 1rem;
+      font-size: 0.95rem;
+      color: #333;
+      min-height: 1.2rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>PhotoGetApp</h1>
+    <p>Run the missing photo report and download the file.</p>
+
+    <label for="exportFormat">Export Format</label>
+    <select id="exportFormat">
+      <option value="csv">CSV</option>
+      <option value="xlsx">XLSX</option>
+    </select>
+
+    <label for="startPage">Start Page</label>
+    <input id="startPage" type="number" value="1" min="1" />
+
+    <label for="endPage">End Page</label>
+    <input id="endPage" type="number" value="0" min="0" />
+
+    <p style="font-size: 0.85rem; margin-top: 0.5rem; text-align: left;">
+      Use 0 to keep going automatically until the scraper hits the stopping rules.
+    </p>
+
+    <button id="runBtn">Run Photo Check</button>
+    <div id="status"></div>
+  </div>
+
+  <script>
+    const runBtn = document.getElementById("runBtn");
+    const status = document.getElementById("status");
+    const exportFormat = document.getElementById("exportFormat");
+    const startPage = document.getElementById("startPage");
+    const endPage = document.getElementById("endPage");
+
+    runBtn.addEventListener("click", async () => {
+      runBtn.disabled = true;
+      status.textContent = "Running photo check...";
+
+      try {
+        const formData = new FormData();
+        formData.append("export_format", exportFormat.value);
+        formData.append("start_page", startPage.value);
+        formData.append("end_page", endPage.value);
+
+        const response = await fetch("/run", {
+          method: "POST",
+          body: formData
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(errorText || "Failed to generate file.");
+        }
+
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+
+        const disposition = response.headers.get("Content-Disposition");
+        let filename = "missing_photos.csv";
+
+        if (disposition && disposition.includes("filename=")) {
+          filename = disposition
+            .split("filename=")[1]
+            .replaceAll('"', '')
+            .trim();
+        }
+
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+
+        window.URL.revokeObjectURL(url);
+        status.textContent = "Done. Download started.";
+      } catch (error) {
+        console.error(error);
+        status.textContent = error.message || "Something went wrong.";
+      } finally {
+        runBtn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
