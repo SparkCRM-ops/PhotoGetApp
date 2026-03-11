@@ -1,14 +1,9 @@
 from __future__ import annotations
 
-import atexit
 import csv
-import json
 import logging
-import os
 import re
 import shutil
-import signal
-import tempfile
 import time
 from datetime import datetime
 from pathlib import Path
@@ -19,6 +14,10 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+
+import threading
+
+scan_lock = threading.Lock()
 
 DEBUG = False
 
@@ -105,53 +104,8 @@ def run_photo_check(
     temp_dir = Path("temp")
     temp_dir.mkdir(exist_ok=True)
 
-    lock_file = os.path.join(tempfile.gettempdir(), "photogetapp.lock")
-
-    def is_running(pid: int) -> bool:
-        try:
-            os.kill(pid, 0)
-            return True
-        except OSError:
-            return False
-
-    old = {}
-    if os.path.exists(lock_file):
-        try:
-            with open(lock_file, "r", encoding="utf-8") as f:
-                old = json.load(f)
-        except Exception:
-            old = {}
-
-    stale_seconds = 3600
-    now = time.time()
-    old_pid = int(old.get("pid", 0)) if old.get("pid") else 0
-    old_ts = float(old.get("ts", 0.0)) if old.get("ts") else 0.0
-
-    if old_pid and is_running(old_pid) and (now - old_ts) < stale_seconds:
-        raise RuntimeError("Another PhotoGetApp scan is already running.")
-
-    try:
-        if os.path.exists(lock_file):
-            os.remove(lock_file)
-    except Exception:
-        pass
-
-    with open(lock_file, "w", encoding="utf-8") as f:
-        json.dump({"pid": os.getpid(), "ts": now}, f)
-
-    def remove_lock(*_args):
-        try:
-            if os.path.exists(lock_file):
-                os.remove(lock_file)
-        except Exception:
-            pass
-
-    atexit.register(remove_lock)
-    for sig in (signal.SIGINT, signal.SIGTERM):
-        try:
-            signal.signal(sig, lambda *_: remove_lock())
-        except Exception:
-            pass
+    if not scan_lock.acquire(blocking=False):
+        raise RuntimeError("A scan is already running.")
 
     logger = logging.getLogger("PhotoGetApp")
     for h in list(logger.handlers):
@@ -421,5 +375,7 @@ def run_photo_check(
         return str(output_path), filename
 
     finally:
-        driver.quit()
-        remove_lock()
+        try:
+            driver.quit()
+        finally:
+            scan_lock.release()
