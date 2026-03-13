@@ -129,6 +129,13 @@
           throw new Error(errorText || "Failed to generate file.");
         }
 
+        const contentType = response.headers.get("Content-Type") || "";
+
+        if (contentType.includes("text/html") || contentType.includes("text/plain")) {
+          const errorText = await response.text();
+          throw new Error(errorText || "Server returned an invalid response.");
+        }
+
         const blob = await response.blob();
         const url = window.URL.createObjectURL(blob);
 
