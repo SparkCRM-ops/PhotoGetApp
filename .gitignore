@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+*.pyo
+temp/
+run_server.command
+.DS_Store

@@ -101,7 +101,7 @@ def run_photo_check(
         except ImportError as exc:
             raise RuntimeError("openpyxl is required for XLSX export") from exc
 
-    temp_dir = Path("temp")
+    temp_dir = Path(__file__).parent / "temp"
     temp_dir.mkdir(exist_ok=True)
 
     if not scan_lock.acquire(blocking=False):
@@ -191,13 +191,21 @@ def run_photo_check(
                 try:
                     driver.get(INVENTORY_URL.format(page))
                     WebDriverWait(driver, 12).until(
-                        EC.presence_of_element_located((By.CSS_SELECTOR, "li[data-unit-id]"))
+                        EC.presence_of_element_located((By.TAG_NAME, "body"))
                     )
                     break
                 except Exception:
                     if attempt == 2:
                         raise
                     time.sleep(1.0 + attempt * 0.8)
+
+            # Wait briefly for inventory listings — non-fatal if absent (empty page logic handles it)
+            try:
+                WebDriverWait(driver, 8).until(
+                    EC.presence_of_element_located((By.CSS_SELECTOR, "li[data-unit-id]"))
+                )
+            except Exception:
+                pass
 
             try:
                 cur = driver.current_url

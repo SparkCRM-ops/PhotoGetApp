@@ -1,3 +1,5 @@
+import traceback
+
 from fastapi import FastAPI, Request, Form
 from fastapi.responses import HTMLResponse, FileResponse, PlainTextResponse
 from fastapi.templating import Jinja2Templates
@@ -10,7 +12,7 @@ templates = Jinja2Templates(directory="templates")
 
 @app.get("/", response_class=HTMLResponse)
 def home(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
+    return templates.TemplateResponse(request=request, name="index.html")
 
 
 @app.post("/run")
@@ -27,6 +29,7 @@ def run_check(
             debug=False,
         )
     except Exception as e:
+        traceback.print_exc()
         return PlainTextResponse(str(e), status_code=500)
 
     media_type = (
